@@ -44,6 +44,21 @@ FORCEINLINE FString FPinRecord::DoubleDigit(const int32 Number)
 {
 	return Number > 9 ? FString::FromInt(Number) : TEXT("0") + FString::FromInt(Number);
 }
+
+bool FConnectionArray::operator==(const FConnectionArray& Other) const
+{
+	if (Connections.Num() != Other.Connections.Num())
+	{
+		return false;
+	}
+
+	if (Connections.GetData() == Other.Connections.GetData())
+	{
+		return true;
+	}
+
+	return CompareItems(Connections.GetData(), Other.Connections.GetData(), Connections.Num());
+}
 #endif
 
 //////////////////////////////////////////////////////////////////////////

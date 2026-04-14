@@ -56,7 +56,9 @@ public class FlowEditor : ModuleRules
 			"SlateCore",
 			"SourceControl",
 			"ToolMenus",
-			"UnrealEd"
+			"UnrealEd", 
+			"QuestFactBase",
+			"QuestFactBaseEditor"
 		]);
 	}
 }

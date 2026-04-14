@@ -655,14 +655,14 @@ bool UFlowNode::TryGetFlowDataPinSupplierDatasForPinName(const FName& PinName, T
 	TryAddSupplierDataToArray(NewPinValueSupplier, InOutPinValueSupplierDatas);
 
 	// If the pin is connected, try to add the connected node as the priority supplier
-	FConnectedPin ConnectedPin;
+	FConnectionArray ConnectedPins;
 
-	if (FindConnectedNodeForPinCached(PinName, ConnectedPin))
+	if (FindConnectedNodeForPinCached(PinName, ConnectedPins) && ConnectedPins.Num() > 0)
 	{
-		const FGuid& ConnectedNodeGuid = ConnectedPin.NodeGuid;
+		const FGuid& ConnectedNodeGuid = ConnectedPins[0].NodeGuid;
 
 		FFlowPinValueSupplierData ConnectedPinValueSupplier;
-		ConnectedPinValueSupplier.SupplierPinName = ConnectedPin.PinName;
+		ConnectedPinValueSupplier.SupplierPinName = ConnectedPins[0].PinName;
 
 		if (const UFlowAsset* FlowAsset = GetFlowAsset())
 		{
@@ -742,8 +742,8 @@ void UFlowNode::FixupDataPinTypesForPin(FFlowPin& MutableDataPin)
 
 void UFlowNode::BuildConnectionChangeList(
 	const UFlowAsset& FlowAsset,
-	const TMap<FName, FConnectedPin>& OldConnections,
-	const TMap<FName, FConnectedPin>& NewConnections,
+	const TMap<FName, FConnectionArray>& OldConnections,
+	const TMap<FName, FConnectionArray>& NewConnections,
 	TArray<FFlowPinConnectionChange>& OutChanges)
 {
 	OutChanges.Reset();
@@ -752,55 +752,39 @@ void UFlowNode::BuildConnectionChangeList(
 	TSet<FName> Keys;
 	Keys.Reserve(OldConnections.Num() + NewConnections.Num());
 
-	for (const TPair<FName, FConnectedPin>& KVP : OldConnections)
+	for (const TPair<FName, FConnectionArray>& KVP : OldConnections)
 	{
 		Keys.Add(KVP.Key);
 	}
 
-	for (const TPair<FName, FConnectedPin>& KVP : NewConnections)
+	for (const TPair<FName, FConnectionArray>& KVP : NewConnections)
 	{
 		Keys.Add(KVP.Key);
 	}
 
 	for (const FName& PinName : Keys)
 	{
-		const FConnectedPin* OldConnectedPin = OldConnections.Find(PinName);
-		const FConnectedPin* NewConnectedPin = NewConnections.Find(PinName);
+		const FConnectionArray* OldArray = OldConnections.Find(PinName);
+		const FConnectionArray* NewArray = NewConnections.Find(PinName);
 
-		const bool bHadOld = (OldConnectedPin != nullptr);
-		const bool bHasNew = (NewConnectedPin != nullptr);
+		TArray<FConnectedPin> OldPins = OldArray ? OldArray->Connections : TArray<FConnectedPin>();
+		TArray<FConnectedPin> NewPins = NewArray ? NewArray->Connections : TArray<FConnectedPin>();
 
-		// If present in both and equal => no change
-		if (bHadOld && bHasNew && (*OldConnectedPin == *NewConnectedPin))
+		for (const FConnectedPin& OldPin : OldPins)
 		{
-			continue;
+			if (!NewPins.Contains(OldPin))
+			{
+				OutChanges.Add(FFlowPinConnectionChange(PinName, FlowAsset.GetNode(OldPin.NodeGuid), OldPin.PinName, nullptr, NAME_None));
+			}
 		}
 
-		UFlowNode* OldConnectedNode = nullptr;
-		FName OldConnectedPinName;
-		if (bHadOld)
+		for (const FConnectedPin& NewPin : NewPins)
 		{
-			OldConnectedNode = FlowAsset.GetNode(OldConnectedPin->NodeGuid);
-			OldConnectedPinName = OldConnectedPin->PinName;
+			if (!OldPins.Contains(NewPin))
+			{
+				OutChanges.Add(FFlowPinConnectionChange(PinName, nullptr, NAME_None, FlowAsset.GetNode(NewPin.NodeGuid), NewPin.PinName));
+			}
 		}
-
-		UFlowNode* NewConnectedNode = nullptr;
-		FName NewConnectedPinName;
-		if (bHasNew)
-		{
-			NewConnectedNode = FlowAsset.GetNode(NewConnectedPin->NodeGuid);
-			NewConnectedPinName = NewConnectedPin->PinName;
-		}
-
-		FFlowPinConnectionChange Change =
-			FFlowPinConnectionChange(
-				PinName,
-				OldConnectedNode,
-				OldConnectedPinName,
-				NewConnectedNode,
-				NewConnectedPinName);
-
-		OutChanges.Add(MoveTemp(Change));
 	}
 }
 
@@ -816,18 +800,18 @@ void UFlowNode::BroadcastEditorPinConnectionsChanged(const TArray<FFlowPinConnec
 		});
 }
 
-void UFlowNode::SetConnections(const TMap<FName, FConnectedPin>& InConnections)
+void UFlowNode::SetConnections(const TMap<FName, FConnectionArray>& InConnections)
 {
-	const TMap<FName, FConnectedPin> OldConnections = Connections;
+	const TMap<FName, FConnectionArray> OldConnections = Connections;
 
 	// Early-out if maps are identical (cheap check first, then deep equality).
 	// Note: TMap equality operator exists for comparable value types; keep explicit check to be safe.
 	if (OldConnections.Num() == InConnections.Num())
 	{
 		bool bAllEqual = true;
-		for (const TPair<FName, FConnectedPin>& KVP : OldConnections)
+		for (const TPair<FName, FConnectionArray>& KVP : OldConnections)
 		{
-			const FConnectedPin* Other = InConnections.Find(KVP.Key);
+			const FConnectionArray* Other = InConnections.Find(KVP.Key);
 			if (!Other || !(*Other == KVP.Value))
 			{
 				bAllEqual = false;
@@ -857,25 +841,34 @@ void UFlowNode::SetConnections(const TMap<FName, FConnectedPin>& InConnections)
 TSet<UFlowNode*> UFlowNode::GatherConnectedNodes() const
 {
 	TSet<UFlowNode*> Result;
-	for (const TPair<FName, FConnectedPin>& Connection : Connections)
+	for (const TPair<FName, FConnectionArray>& ConnectionArray : Connections)
 	{
-		Result.Emplace(GetFlowAsset()->GetNode(Connection.Value.NodeGuid));
+		for (const FConnectedPin& Connection : ConnectionArray.Value)
+		{
+			Result.Emplace(GetFlowAsset()->GetNode(Connection.NodeGuid));	
+		}		
 	}
 
 	return Result;
 }
 
-FName UFlowNode::GetPinConnectedToNode(const FGuid& OtherNodeGuid)
+TArray<FName> UFlowNode::GetPinsConnectedToNode(const FGuid& OtherNodeGuid)
 {
-	for (const TPair<FName, FConnectedPin>& Connection : Connections)
+	TArray<FName> ConnectedPins;
+	
+	for (const TPair<FName, FConnectionArray>& ConnectionArray : Connections)
 	{
-		if (Connection.Value.NodeGuid == OtherNodeGuid)
+		for (const FConnectedPin& Connection : ConnectionArray.Value)
 		{
-			return Connection.Key;
-		}
+			if (Connection.NodeGuid == OtherNodeGuid)
+			{
+				ConnectedPins.Emplace(ConnectionArray.Key);
+				break;
+			}
+		}		
 	}
 
-	return NAME_None;
+	return ConnectedPins;
 }
 
 bool UFlowNode::IsInputConnected(const FName& PinName, bool bErrorIfPinNotFound) const
@@ -967,7 +960,13 @@ bool UFlowNode::FindFirstPinConnection(
 	if (bUseCachedPath)
 	{
 		// Cached category: fast lookup (0/1 connection)
-		return FindConnectedNodeForPinCached(FlowPin.PinName, FirstConnectedPin);
+		FConnectionArray ConnectionsForPin;
+		if (FindConnectedNodeForPinCached(FlowPin.PinName, ConnectionsForPin) && ConnectionsForPin.Num() > 0)
+		{
+			FirstConnectedPin = ConnectionsForPin[0];
+			return true;
+		}
+		return false;
 	}
 	else
 	{
@@ -1000,11 +999,14 @@ bool UFlowNode::FindPinConnections(const FFlowPin& FlowPin, const TArray<FFlowPi
 	{
 		// NOTE (gtaylor) For optimal perf, you should use the non-array signature when asking for cached path
 		// (aka optimal use should use this branch)
-		FConnectedPin ConnectedPin;
-		const bool bFoundPin = FindConnectedNodeForPinCached(FlowPin.PinName, ConnectedPin);
+		FConnectionArray ConnectionsForPin;
+		const bool bFoundPin = FindConnectedNodeForPinCached(FlowPin.PinName, ConnectionsForPin);
 		if (bFoundPin && ConnectedPins)
 		{
-			ConnectedPins->Add(ConnectedPin);
+			for (const FConnectedPin& Pin : ConnectionsForPin)
+			{
+				ConnectedPins->Add(Pin);
+			}
 		}
 
 		return bFoundPin;
@@ -1069,17 +1071,16 @@ FFlowPin* UFlowNode::FindOutputPinByName(const FName& PinName)
 	return nullptr;
 }
 
-bool UFlowNode::FindConnectedNodeForPinCached(const FName& FlowPinName, FConnectedPin& ConnectedPin) const
+bool UFlowNode::FindConnectedNodeForPinCached(const FName& FlowPinName, FConnectionArray& ConnectedPins) const
 {
 	// NOTE (gtaylor) The Connections array only caches:
 	// - exec output pins
 	// - data input pins
 	// In both cases, there must be only one connection (due to schema rules in Flow).
 	// For the opposite direction (exec inputs, data outputs, the uncached version must be used.
-	const FConnectedPin* FoundConnectedPin = Connections.Find(FlowPinName);
-	if (FoundConnectedPin)
+	if (const FConnectionArray* FoundConnectedPin = Connections.Find(FlowPinName))
 	{
-		ConnectedPin = *FoundConnectedPin;
+		ConnectedPins = *FoundConnectedPin;
 
 		return true;
 	}
@@ -1107,20 +1108,21 @@ bool UFlowNode::FindConnectedNodeForPinUncached(const FName& PinName, TArray<FCo
 			continue;
 		}
 
-		for (const TPair<FName, FConnectedPin>& Connection : ConnectedFromFlowNode->Connections)
+		for (const TPair<FName, FConnectionArray>& ConnectionPair : ConnectedFromFlowNode->Connections)
 		{
-			const FConnectedPin& ConnectedPinStruct = Connection.Value;
-
-			if (ConnectedPinStruct.NodeGuid == NodeGuid && ConnectedPinStruct.PinName == PinName)
+			for (const FConnectedPin& ConnectedPinStruct : ConnectionPair.Value)
 			{
-				if (ConnectedPins)
+				if (ConnectedPinStruct.NodeGuid == NodeGuid && ConnectedPinStruct.PinName == PinName)
 				{
-					ConnectedPins->Add(ConnectedPinStruct);
-				}
-				else
-				{
-					// Early return if not collecting the ConnectedPins, since only connected true/false matters
-					return true;
+					if (ConnectedPins)
+					{
+						ConnectedPins->Add(ConnectedPinStruct);
+					}
+					else
+					{
+						// Early return if not collecting the ConnectedPins, since only connected true/false matters
+						return true;
+					}
 				}
 			}
 		}
@@ -1140,19 +1142,27 @@ TArray<FConnectedPin> UFlowNode::GetKnownConnectionsToPin(const FConnectedPin& P
 
 	if (Pin.NodeGuid == NodeGuid)
 	{
-		const FConnectedPin& Connection = Connections.FindRef(Pin.PinName);
-		if (Connection.NodeGuid.IsValid())
+		if (const FConnectionArray* ConnectionsArray = Connections.Find(Pin.PinName))
 		{
-			ConnectedPins.Add(Connection);
+			for (const FConnectedPin& Connection : *ConnectionsArray)
+			{
+				if (Connection.NodeGuid.IsValid())
+				{
+					ConnectedPins.Add(Connection);
+				}
+			}
 		}
 	}
 	else
 	{
-		for (const TPair<FName, FConnectedPin>& Connection : Connections)
+		for (const TPair<FName, FConnectionArray>& ConnectionPair : Connections)
 		{
-			if (Connection.Value.NodeGuid == Pin.NodeGuid && Connection.Value.PinName == Pin.PinName)
+			for (const FConnectedPin& Connection : ConnectionPair.Value)
 			{
-				ConnectedPins.Emplace(NodeGuid, Connection.Key);
+				if (Connection.NodeGuid == Pin.NodeGuid && Connection.PinName == Pin.PinName)
+				{
+					ConnectedPins.Emplace(NodeGuid, ConnectionPair.Key);
+				}
 			}
 		}
 	}
@@ -1300,8 +1310,13 @@ void UFlowNode::TriggerOutput(const FName PinName, const bool bFinish /*= false*
 	// call the next node
 	if (OutputPins.Contains(PinName) && Connections.Contains(PinName))
 	{
-		const FConnectedPin FlowPin = GetConnection(PinName);
-		GetFlowAsset()->TriggerInput(FlowPin.NodeGuid, FlowPin.PinName, FConnectedPin(GetGuid(), PinName));
+		if (const FConnectionArray* ConnectedPins = Connections.Find(PinName))
+		{
+			for (const FConnectedPin& FlowPin : *ConnectedPins)
+			{
+				GetFlowAsset()->TriggerInput(FlowPin.NodeGuid, FlowPin.PinName, FConnectedPin(GetGuid(), PinName));
+			}
+		}
 	}
 }
 

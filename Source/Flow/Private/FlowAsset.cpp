@@ -538,7 +538,7 @@ void UFlowAsset::HarvestNodeConnections(UFlowNode* TargetNode)
 		}
 	}
 
-	for (const TPair<FGuid, UFlowNode*>& Pair : Nodes)
+	for (const TPair<FGuid, TObjectPtr<UFlowNode>>& Pair : Nodes)
 	{
 		UFlowNode* Node = Pair.Value;
 		TMap<FName, FConnectionArray> FoundConnections;
