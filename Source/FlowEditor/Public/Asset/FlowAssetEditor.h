@@ -12,7 +12,7 @@
 class FFlowMessageLog;
 class SFlowGraphEditor;
 class SFlowPalette;
-class SQuestFactBaseEditor; // @tiramisoo
+class SZWQuestFactBaseEditor; // @tiramisoo
 class UFlowAsset;
 class UFlowGraphNode;
 
@@ -48,7 +48,7 @@ protected:
 	TSharedPtr<SFlowGraphEditor> GraphEditor;
 	TSharedPtr<class IDetailsView> DetailsView;
 	TSharedPtr<class SFlowPalette> Palette;	
-	TSharedPtr<class SQuestFactBaseEditor> QuestFactBaseEditor; // @tiramisoo
+	TSharedPtr<class SZWQuestFactBaseEditor> QuestFactBaseEditor; // @tiramisoo
 
 #if ENABLE_SEARCH_IN_ASSET_EDITOR
 	TSharedPtr<class SSearchBrowser> SearchBrowser;

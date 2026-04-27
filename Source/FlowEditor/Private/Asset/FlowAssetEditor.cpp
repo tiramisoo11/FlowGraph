@@ -11,7 +11,7 @@
 #include "Graph/FlowGraphEditor.h"
 #include "Graph/FlowGraphSchema.h"
 #include "Graph/Widgets/SFlowPalette.h"
-#include "SQuestFactBaseEditor.h" // @tiramisoo
+#include "SZWQuestFactBaseEditor.h" // @tiramisoo
 
 #include "FlowAsset.h"
 
@@ -510,7 +510,7 @@ void FFlowAssetEditor::CreateWidgets()
 	Palette = SNew(SFlowPalette, SharedThis(this));
 	
 	// @tiramisoo - QuestFactBaseEditor
-	QuestFactBaseEditor = SNew(SQuestFactBaseEditor);
+	QuestFactBaseEditor = SNew(SZWQuestFactBaseEditor);
 
 	// Search
 #if ENABLE_SEARCH_IN_ASSET_EDITOR

@@ -57,8 +57,8 @@ public class FlowEditor : ModuleRules
 			"SourceControl",
 			"ToolMenus",
 			"UnrealEd", 
-			"QuestFactBase",
-			"QuestFactBaseEditor"
+			"ZWQuestFactBase",
+			"ZWQuestFactBaseEditor"
 		]);
 	}
 }
