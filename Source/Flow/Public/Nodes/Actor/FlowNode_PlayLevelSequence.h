@@ -5,8 +5,6 @@
 #include "Engine/StreamableManager.h"
 #include "LevelSequencePlayer.h"
 #include "MovieSceneSequencePlayer.h"
-#include "UObject/ObjectSaveContext.h"
-
 
 #include "Nodes/FlowNode.h"
 #include "FlowNode_PlayLevelSequence.generated.h"
@@ -14,16 +12,6 @@
 class UFlowLevelSequencePlayer;
 
 DECLARE_MULTICAST_DELEGATE(FFlowNodeLevelSequenceEvent);
-
-// @tiramisoo - Advanced level sequence handling
-UENUM()
-enum class ELevelSequenceType
-{
-	NotSet UMETA(Hidden),
-	LocalSequence,
-	Asset
-};
-// @tiramisoo
 
 /**
  * Order of triggering outputs after calling Start
@@ -46,19 +34,8 @@ public:
 	static FFlowNodeLevelSequenceEvent OnPlaybackStarted;
 	static FFlowNodeLevelSequenceEvent OnPlaybackCompleted;
 
-	// @tiramisoo - Advanced level sequence handling
-	UPROPERTY(EditAnywhere, Category = "Sequence", meta = (Tooltip = "Double click the node to edit"))
-	ELevelSequenceType SequenceToUse = ELevelSequenceType::NotSet;
-
 	UPROPERTY(EditAnywhere, Category = "Sequence")
 	TSoftObjectPtr<ULevelSequence> Sequence;
-
-	UPROPERTY(EditAnywhere, Category = "Sequence", meta = (EditCondition = "SequenceToUse==ELevelSequenceType::Asset", EditConditionHides))
-	TSoftObjectPtr<ULevelSequence> SequenceAsset;
-
-	UPROPERTY(EditAnywhere, Category = "Sequence", Instanced, meta = (EditCondition = "SequenceToUse==ELevelSequenceType::LocalSequence", EditConditionHides))
-	ULevelSequence* LocalSequence = nullptr;
-	// @tiramisoo
 
 	UPROPERTY(EditAnywhere, Category = "Sequence")
 	FMovieSceneSequencePlaybackSettings PlaybackSettings;
@@ -117,16 +94,8 @@ public:
 	// --
 
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-
-	// @tiramisoo - Advanced level sequence handling
-	virtual void PostLoad() override;
-
-	virtual void FixNode(UEdGraphNode* NewGraphNode) override;
-	// @tiramisoo
 #endif
-	// @tiramisoo - Advanced level sequence handling
-	ULevelSequence* CreateLevelSequence(UObject* Parent, const FName& Name);
-	
+
 	virtual void PreloadContent() override;
 	virtual void FlushContent() override;
 
