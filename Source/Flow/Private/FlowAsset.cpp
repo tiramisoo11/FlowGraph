@@ -524,7 +524,6 @@ void UFlowAsset::UnregisterNode(const FGuid& NodeGuid)
 // @tiramisoo - Multiple output connections handling
 void UFlowAsset::HarvestNodeConnections(UFlowNode* TargetNode)
 {
-	TMap<FName, FConnectionArray> Connections;
 	bool bGraphDirty = false;
 
 	// last moment to remove invalid nodes
