@@ -32,7 +32,7 @@ public:
 	/* The tab ids for all the tabs used. */
 	static const FName DetailsTab;
 	static const FName GraphTab;
-	static const FName PaletteTab;
+	static const FName PaletteTab;	
 	static const FName RuntimeLogTab;
 	static const FName SearchTab;
 	static const FName ValidationLogTab;
@@ -45,7 +45,7 @@ protected:
 
 	TSharedPtr<SFlowGraphEditor> GraphEditor;
 	TSharedPtr<class IDetailsView> DetailsView;
-	TSharedPtr<class SFlowPalette> Palette;
+	TSharedPtr<class SFlowPalette> Palette;	
 
 #if ENABLE_SEARCH_IN_ASSET_EDITOR
 	TSharedPtr<class SSearchBrowser> SearchBrowser;

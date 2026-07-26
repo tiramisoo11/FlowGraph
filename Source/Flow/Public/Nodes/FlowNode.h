@@ -187,19 +187,19 @@ protected:
 protected:
 	/* Map input/outputs to the connected node and input pin. */
 	UPROPERTY()
-	TMap<FName, FConnectedPin> Connections;
+	TMap<FName, FConnectionArray> Connections;
 
 public:
 #if WITH_EDITOR
-	void SetConnections(const TMap<FName, FConnectedPin>& InConnections);
+	void SetConnections(const TMap<FName, FConnectionArray>& InConnections);
 #endif
 
-	FConnectedPin GetConnection(const FName OutputName) const { return Connections.FindRef(OutputName); }
+	FConnectionArray GetConnections(const FName OutputName) const { return Connections.FindRef(OutputName); }
 
 	UFUNCTION(BlueprintPure, Category= "FlowNode")
 	TSet<UFlowNode*> GatherConnectedNodes() const;
 
-	FName GetPinConnectedToNode(const FGuid& OtherNodeGuid);
+	TArray<FName> GetPinsConnectedToNode(const FGuid& OtherNodeGuid);
 
 	UFUNCTION(BlueprintPure, Category= "FlowNode")
 	bool IsInputConnected(const FName& PinName, bool bErrorIfPinNotFound = true) const;
@@ -236,7 +236,7 @@ public:
 protected:
 	/* Slow and fast lookup functions, based on whether we are proactively caching the connections for quick lookup
 	 * in the Connections array (by PinCategory). */
-	bool FindConnectedNodeForPinCached(const FName& FlowPinName, FConnectedPin& ConnectedPin) const;
+	bool FindConnectedNodeForPinCached(const FName& FlowPinName, FConnectionArray& ConnectedPin) const;
 	bool FindConnectedNodeForPinUncached(const FName& FlowPinName, TArray<FConnectedPin>* ConnectedPins = nullptr) const;
 
 	/* Helper templates for Find*PinConnection* functions */
@@ -254,8 +254,8 @@ protected:
 #if WITH_EDITOR
 	static void BuildConnectionChangeList(
 		const UFlowAsset& FlowAsset,
-		const TMap<FName, FConnectedPin>& OldConnections,
-		const TMap<FName, FConnectedPin>& NewConnections,
+		const TMap<FName, FConnectionArray>& OldConnections,
+		const TMap<FName, FConnectionArray>& NewConnections,
 		TArray<FFlowPinConnectionChange>& OutChanges);
 
 	/* Broadcasts OnEditorPinConnectionsChanged to this node and all AddOns */
